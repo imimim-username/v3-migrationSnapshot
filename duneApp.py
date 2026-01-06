@@ -288,6 +288,59 @@ df = pd.DataFrame(optimismBalances)
 df.to_csv('OptimismBalances-long_script.csv', index=False)
 print('Saved to CSV')
 
+
+arbitrumBalances = []
+for alchemist in arbitrumInfo['alchemists']:
+    counter = 0
+    print('Arbitrum')
+    print('Alchemist: ' + alchemist['name'])
+    
+    addresses = getQuery(arbitrumInfo['queryID'])
+    
+    for vault in alchemist['vaults']:
+        print('Vault: ' + vault['name'])    
+        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
+        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'arb'), 16)
+        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
+
+        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
+        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'arb'), 16)
+        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))    
+
+        secondCounter = 0
+        for address in addresses:
+            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'arb')
+            print('Balance: ' + str(balance))
+            
+            if balance > 0:
+                tempBalance = {
+                    'address': address['address'],
+                    'yieldToken': vault['name'],
+                    'yieldTokenAddress': vault['address'],
+                    'alchemist': alchemist['name'],
+                    'alchemistAddress': alchemist['address'],
+                    'shares': balance,
+                    'underlyingTokensPerShare': underlyingTokensPerShare,
+                    'yieldTokensPerShare': yieldTokensPerShare
+                }
+                arbitrumBalances.append(tempBalance)
+            secondCounter += 1
+
+            if secondCounter >= 1:
+                break
+
+        counter += 1
+        
+        if counter >= 1:
+            break
+
+    print('--------------------------------')
+
+print('Saving to CSV...')
+df = pd.DataFrame(arbitrumBalances)
+df.to_csv('ArbitrumBalances-long_script.csv', index=False)
+print('Saved to CSV')
+
 #test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
 
 #print(test)
