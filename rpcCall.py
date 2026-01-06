@@ -36,7 +36,10 @@ def rpcCall (targetAddress, dataString, blockNumber, chain):
         ]
     }
 
-    rpcData = requests.post(apiString, headers=headers, data=json.dumps(payload)).json()
+    print('Result:')
+    rpcData = requests.post(apiString, headers=headers, data=json.dumps(payload))
+    print(rpcData.text)
+    rpcData = rpcData.json()
 
     return rpcData['result']
 
