@@ -13,8 +13,10 @@ def getBalances(address, alchemist, vault, chain):
     blockNumber = 'latest'
 
     rpcData = rpcCall(alchemist, dataString, blockNumber, chain)
-
-    return rpcData
+    #print(rpcData)
+    balance = int(rpcData[:66], 16)
+    
+    return balance
 
 mainnetInfo = {
     'queryID': 6475554, # dune query with all depositor addresses
@@ -182,16 +184,110 @@ arbitrumInfo = {
     ]
 }
 
-'''
-addresses = getQuery(mainnetInfo['queryID'])
+mainnetBalances = []
+for alchemist in mainnetInfo['alchemists']:
+    counter = 0
+    print('Mainnet')
+    print('Alchemist: ' + alchemist['name'])
+    
+    addresses = getQuery(mainnetInfo['queryID'])
+    
+    for vault in alchemist['vaults']:
+        print('Vault: ' + vault['name'])    
+        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
+        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'eth'), 16)
+        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
 
-for address in addresses:
-    print(address)
+        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
+        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'eth'), 16)
+        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
 
-    for alchemist in mainnetInfo['alchemists']:
-        for vault in alchemist['vaults']:
-'''
+        secondCounter = 0
+        for address in addresses:
+            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'eth')
+            print('Balance: ' + str(balance))
+            
+            if balance > 0:
+                tempBalance = {
+                    'address': address['address'],
+                    'yieldToken': vault['name'],
+                    'yieldTokenAddress': vault['address'],
+                    'alchemist': alchemist['name'],
+                    'alchemistAddress': alchemist['address'],
+                    'shares': balance,
+                    'underlyingTokensPerShare': underlyingTokensPerShare,
+                    'yieldTokensPerShare': yieldTokensPerShare
+                }
+                mainnetBalances.append(tempBalance)
+            secondCounter += 1
 
-test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
+            if secondCounter >= 1:
+                break
 
-print(test)
+        counter += 1
+        
+        if counter >= 1:
+            break
+    print('--------------------------------')
+
+print('Saving to CSV...')
+df = pd.DataFrame(mainnetBalances)
+df.to_csv('MainnetBalances-long_script.csv', index=False)
+print('Saved to CSV')
+
+
+optimismBalances = []
+for alchemist in optimismInfo['alchemists']:
+    counter = 0
+    print('Optimism')
+    print('Alchemist: ' + alchemist['name'])
+    
+    addresses = getQuery(optimismInfo['queryID'])
+    
+    for vault in alchemist['vaults']:
+        print('Vault: ' + vault['name'])    
+        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
+        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'op'), 16)
+        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
+
+        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
+        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'op'), 16)
+        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
+
+        secondCounter = 0
+        for address in addresses:
+            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'op')
+            print('Balance: ' + str(balance))
+
+            if balance > 0:
+                tempBalance = {
+                    'address': address['address'],
+                    'yieldToken': vault['name'],
+                    'yieldTokenAddress': vault['address'],
+                    'alchemist': alchemist['name'],
+                    'alchemistAddress': alchemist['address'],
+                    'shares': balance,
+                    'underlyingTokensPerShare': underlyingTokensPerShare,
+                    'yieldTokensPerShare': yieldTokensPerShare
+                }
+                optimismBalances.append(tempBalance)
+            secondCounter += 1
+
+            if secondCounter >= 1:
+                break
+
+        counter += 1
+        
+        if counter >= 1:
+            break
+
+    print('--------------------------------')
+
+print('Saving to CSV...')
+df = pd.DataFrame(optimismBalances)
+df.to_csv('OptimismBalances-long_script.csv', index=False)
+print('Saved to CSV')
+
+#test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
+
+#print(test)

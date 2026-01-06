@@ -5,8 +5,9 @@ def rpcCall (targetAddress, dataString, blockNumber, chain):
     from dotenv import load_dotenv
     import os
 
-    
+    load_dotenv()
     alchemy_key = os.getenv("ALCHEMY_API_KEY")
+    #print('Alchemy key: ' + alchemy_key)
 
     match chain:
         case 'eth':
