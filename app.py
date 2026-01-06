@@ -82,7 +82,7 @@ def buildBalances(url):
     for yieldToken in yieldTokens:
         keepGoing = True
         multiplier = 0
-
+        print('Getting balances for ' + yieldToken['name'] + '...')
         while keepGoing:
             tempBalances = getGraphBalances(multiplier, url, yieldToken['id'])['data']['alchemistBalances']
             
