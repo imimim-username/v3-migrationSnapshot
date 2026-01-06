@@ -6,8 +6,6 @@ def updateQuery (inputID):
     from dune_client.client import DuneClient
     from dune_client.query import QueryBase
 
-    # change the current working directory where .env file lives
-    os.chdir("/home/imimim/alchemix/dune")
     # load .env file
     dotenv.load_dotenv("dune.env")
     # setup Dune Python client
@@ -42,8 +40,6 @@ def getQuery (inputID):
     from dune_client.client import DuneClient
     from dune_client.query import QueryBase
 
-    # change the current working directory where .env file lives
-    os.chdir("/home/imimim/alchemix/dune")
     # load .env file
     dotenv.load_dotenv("dune.env")
     # setup Dune Python client
