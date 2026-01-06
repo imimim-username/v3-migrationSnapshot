@@ -52,7 +52,7 @@ def getGraphBalances(multiplier, graphURL):
     return queryResponse
 
 keepGoing = True
-multiplier = 1
+multiplier = 0
 
 balances = []
 
