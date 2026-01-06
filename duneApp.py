@@ -141,5 +141,35 @@ optimismInfo = {
     ]
 }
 
+arbitrumInfo = {
+    'queryID': 6475592, # dune query with all depositor addresses
+    'alchemists': [ # the alchemists 
+        {
+            'name': 'alETH',
+            'address': '0x654e16a0b161b150F5d1C8a5ba6E7A7B7760703A',
+            'vaults': [
+                {
+                    'name': 'wstETH',
+                    'address': '0x5979D7b546E38E414F7E9822514be443A4800529'
+                },
+                {
+                    'name': 'farmdWETHV3',
+                    'address': '0xf3b7994e4da53e04155057fd61dc501599d57877'
+                }
+            ]
+        },
+        {
+            'name': 'alUSD',
+            'address': '0xb46eE2E4165F629b4aBCE04B7Eb4237f951AC66F',
+            'vaults': [
+                {
+                    'name': 'aUSDC',
+                    'address': '0x248a431116c6f6FCD5Fe1097d16d0597E24100f5'
+                }
+            ]
+        }
+    ]
+}
+
 
 print(getQuery(6475554))
