@@ -4,6 +4,17 @@ import requests
 import pandas as pd
 
 from runDuneQuery import updateQuery, getQuery #(inputID)
+from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
+
+def getBalances(address, alchemist, vault, chain):
+# example: {"jsonrpc":"2.0","id":7189484897142231,"method":"eth_call","params":[{"from":"0x0000000000000000000000000000000000000000","data":"0x4bd214450000000000000000000000002330eb2d92167c3b6b22690c03b508e0ca532980000000000000000000000000a258c4606ca8206d8aa700ce2143d7db854d168c","to":"0x062bf725dc4cdf947aa79ca2aaccd4f385b13b5c"},"latest"]}
+
+    dataString = '0x4bd21445000000000000000000000000' + address[2:] + '000000000000000000000000' + vault[2:]
+    blockNumber = 'latest'
+
+    rpcData = rpcCall(alchemist, dataString, blockNumber, chain)
+
+    return rpcData
 
 mainnetInfo = {
     'queryID': 6475554, # dune query with all depositor addresses
@@ -171,5 +182,16 @@ arbitrumInfo = {
     ]
 }
 
+'''
+addresses = getQuery(mainnetInfo['queryID'])
 
-print(getQuery(6475554))
+for address in addresses:
+    print(address)
+
+    for alchemist in mainnetInfo['alchemists']:
+        for vault in alchemist['vaults']:
+'''
+
+test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
+
+print(test)
