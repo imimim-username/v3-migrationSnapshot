@@ -191,6 +191,8 @@ for alchemist in mainnetInfo['alchemists']:
     print('Alchemist: ' + alchemist['name'])
     
     addresses = getQuery(mainnetInfo['queryID'])
+    #addresses = updateQuery(optimismInfo['queryID'])
+    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
     
     for vault in alchemist['vaults']:
         print('Vault: ' + vault['name'])    
@@ -219,15 +221,15 @@ for alchemist in mainnetInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 mainnetBalances.append(tempBalance)
-            secondCounter += 1
+            #secondCounter += 1
 
-            if secondCounter >= 1:
-                break
+            #if secondCounter >= 1:
+            #    break
 
-        counter += 1
+        #counter += 1
         
-        if counter >= 1:
-            break
+        #if counter >= 1:
+        #    break
     print('--------------------------------')
 
 print('Saving to CSV...')
@@ -243,6 +245,8 @@ for alchemist in optimismInfo['alchemists']:
     print('Alchemist: ' + alchemist['name'])
     
     addresses = getQuery(optimismInfo['queryID'])
+    #addresses = updateQuery(optimismInfo['queryID'])
+    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
     
     for vault in alchemist['vaults']:
         print('Vault: ' + vault['name'])    
@@ -271,15 +275,15 @@ for alchemist in optimismInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 optimismBalances.append(tempBalance)
-            secondCounter += 1
+            #secondCounter += 1
 
-            if secondCounter >= 1:
-                break
+            #if secondCounter >= 1:
+            #    break
 
-        counter += 1
+        #counter += 1
         
-        if counter >= 1:
-            break
+        #if counter >= 1:
+        #    break
 
     print('--------------------------------')
 
@@ -296,6 +300,8 @@ for alchemist in arbitrumInfo['alchemists']:
     print('Alchemist: ' + alchemist['name'])
     
     addresses = getQuery(arbitrumInfo['queryID'])
+    #addresses = updateQuery(optimismInfo['queryID'])
+    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
     
     for vault in alchemist['vaults']:
         print('Vault: ' + vault['name'])    
@@ -324,15 +330,15 @@ for alchemist in arbitrumInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 arbitrumBalances.append(tempBalance)
-            secondCounter += 1
+            #  secondCounter += 1
 
-            if secondCounter >= 1:
-                break
+            #if secondCounter >= 1:
+            #    break
 
-        counter += 1
+        #counter += 1
         
-        if counter >= 1:
-            break
+        #if counter >= 1:
+        #    break
 
     print('--------------------------------')
 

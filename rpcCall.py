@@ -5,6 +5,10 @@ def rpcCall (targetAddress, dataString, blockNumber, chain):
     from dotenv import load_dotenv
     import os
 
+    import time
+    # Add a small delay to prevent rate limiting
+    time.sleep(0.75)
+    
     load_dotenv()
     alchemy_key = os.getenv("ALCHEMY_API_KEY")
     #print('Alchemy key: ' + alchemy_key)
