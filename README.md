@@ -74,6 +74,8 @@ This will generate:
 - **rpcCall.py** - Utility module for making RPC calls to blockchain networks
 - **runDuneQuery.py** - Utility module for interacting with Dune Analytics API
 
+Adjust the minimum shares values for each script as deemed appropriate.
+
 ## Output
 
 Both scripts generate CSV files containing:
