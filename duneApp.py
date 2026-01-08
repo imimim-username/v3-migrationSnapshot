@@ -346,7 +346,3 @@ print('Saving to CSV...')
 df = pd.DataFrame(arbitrumBalances)
 df.to_csv('ArbitrumBalances-long_script.csv', index=False)
 print('Saved to CSV')
-
-#test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
-
-#print(test)
