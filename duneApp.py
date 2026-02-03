@@ -9,13 +9,16 @@ from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
 
 BALANCE_WORKERS = 50
 
-def getBalances(address, alchemist, vault, chain, session=None):
+def getBalances(address, alchemist, vault, chain, session=None, progress_chain_label=None, progress_vault_name=None, progress_current=None, progress_total=None):
 # example: {"jsonrpc":"2.0","id":7189484897142231,"method":"eth_call","params":[{"from":"0x0000000000000000000000000000000000000000","data":"0x4bd214450000000000000000000000002330eb2d92167c3b6b22690c03b508e0ca532980000000000000000000000000a258c4606ca8206d8aa700ce2143d7db854d168c","to":"0x062bf725dc4cdf947aa79ca2aaccd4f385b13b5c"},"latest"]}
 
     dataString = '0x4bd21445000000000000000000000000' + address[2:] + '000000000000000000000000' + vault[2:]
     blockNumber = 'latest'
 
-    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session)
+    progress_prefix = None
+    if progress_chain_label is not None and progress_vault_name is not None and progress_current is not None and progress_total is not None:
+        progress_prefix = f"{progress_chain_label} | {progress_vault_name} | {progress_current}/{progress_total}"
+    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session, progress_prefix=progress_prefix)
     #print(rpcData)
     balance = int(rpcData[:66], 16)
     
@@ -33,17 +36,18 @@ def run_chain(chain_info, chain_label, chain_id):
         for vault in alchemist['vaults']:
             print('Vault: ' + vault['name'])
             dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:]
-            underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session, progress_prefix=f"{chain_label} | {vault['name']} | underlying per share"), 16)
             print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
             dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
-            yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session, progress_prefix=f"{chain_label} | {vault['name']} | yield per share"), 16)
             print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
 
             address_to_balance = {}
+            total_addresses = len(addresses)
             with ThreadPoolExecutor(max_workers=BALANCE_WORKERS) as executor:
                 future_to_address = {
-                    executor.submit(getBalances, addr['address'], alchemist['address'], vault['address'], chain_id, session): addr
-                    for addr in addresses
+                    executor.submit(getBalances, addr['address'], alchemist['address'], vault['address'], chain_id, session, chain_label, vault['name'], i + 1, total_addresses): addr
+                    for i, addr in enumerate(addresses)
                 }
                 for future in as_completed(future_to_address):
                     addr = future_to_address[future]

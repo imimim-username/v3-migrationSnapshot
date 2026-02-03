@@ -1,4 +1,4 @@
-def rpcCall (targetAddress, dataString, blockNumber, chain, session=None):
+def rpcCall (targetAddress, dataString, blockNumber, chain, session=None, progress_prefix=None):
 
     import requests
     import json
@@ -52,6 +52,8 @@ def rpcCall (targetAddress, dataString, blockNumber, chain, session=None):
         ]
     }
 
+    if progress_prefix is not None:
+        print(progress_prefix)
     print('Result:')
     if session is not None:
         rpcData = session.post(apiString, headers=headers, data=json.dumps(payload))
