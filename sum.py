@@ -11,7 +11,7 @@ def alEthUnderlyingBalances(inputDf):
     inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int)
 
     
-    inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] / 1e18
+    inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] // 1e18
 
     """
     pivotDf = (
@@ -28,7 +28,7 @@ def alEthFilterAndPivot(inputDf):
     # filters out low underlyingValue balances from aleth DFs and then creates a pivot table that sums underlying value by address
 
     lowValue = 100000000000000
-    inputDf = inputDf[inputDf['underlyingValue'] > lowValue]
+    inputDf = inputDf[inputDf['underlyingValue'] >= lowValue]
     
     pivotDf = (
         inputDf
@@ -55,9 +55,26 @@ def normalizeAlusdBalances(inputDf, chain):
     mask_6 = inputDf["yieldToken"].isin(six_list) 
     product = inputDf["shares"] * inputDf["underlyingTokensPerShare"] 
     divisor = np.where(mask_6, 10**6, 10**18) 
-    inputDf["underlyingValue"] = product / divisor 
+    inputDf["underlyingValue"] = product // divisor 
+
+    mask_fix = mask_6 | (inputDf["yieldToken"] == weirdo)
+    inputDf.loc[mask_fix, "underlyingValue"] = inputDf.loc[mask_fix, "underlyingValue"] * 10**12
 
     return inputDf
+
+def alUsdFilterAndPivot(inputDf):
+    # filters out low underlyingValue balances from alUSD DFs and then creates a pivot table that sums underlying value by address
+
+    lowValue = 10000000000000000
+    inputDf = inputDf[inputDf['underlyingValue'] >= lowValue]
+    
+    pivotDf = (
+        inputDf
+        .groupby("address", as_index=False)["underlyingValue"]
+        .sum()
+    )
+    
+    return pivotDf
 
 originFiles = {
     'mainnet': 'MainnetBalances-long_script.csv',
@@ -100,10 +117,7 @@ for chain, df in originDataFrames.items():
     print(f"Saved {fileName}")
 
     alusdDf = normalizeAlusdBalances(alusdDf, chain)
-    alusdPivotDf = alEthFilterAndPivot(alusdDf)
+    alusdPivotDf = alUsdFilterAndPivot(alusdDf)
     print(alusdPivotDf.head())
 
-    fileName = 'alusdValues-' + chain + '.csv'
-    print(f"Saving {fileName}...")
-    alusdPivotDf.to_csv(fileName, index=False)
-    print(f"Saved {fileName}")
+    
