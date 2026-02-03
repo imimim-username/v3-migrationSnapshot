@@ -38,6 +38,15 @@ alchemistAddresses = {
     }
 }
 
+def twos_complement(hex_value):
+    # takes a hexadecimal string and returns the two's complement signed integer
+    hex_digits = hex_value[2:] if hex_value.startswith('0x') else hex_value
+    bits = len(hex_digits) * 4
+    value = int(hex_value, 16)
+    if value & (1 << (bits - 1)):
+        value -= 1 << bits
+    return value
+
 
 def fetch_debt(task):
     """Worker: takes (index, address, chain, vault), returns (index, debt). On RPC failure returns (index, None)."""
@@ -46,7 +55,7 @@ def fetch_debt(task):
     data_string = '0x5e5c06e2000000000000000000000000' + address_hex
     try:
         result = rpcCall(alchemistAddresses[chain][vault], data_string, 'latest', chain)
-        debt = int(result[:66], 16)
+        debt = twos_complement(result[:66])
         return (index, debt)
     except Exception:
         return (index, None)
