@@ -2,21 +2,76 @@ from dotenv import load_dotenv
 import os
 import requests
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from runDuneQuery import updateQuery, getQuery #(inputID)
 from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
 
-def getBalances(address, alchemist, vault, chain):
+BALANCE_WORKERS = 50
+
+def getBalances(address, alchemist, vault, chain, session=None):
 # example: {"jsonrpc":"2.0","id":7189484897142231,"method":"eth_call","params":[{"from":"0x0000000000000000000000000000000000000000","data":"0x4bd214450000000000000000000000002330eb2d92167c3b6b22690c03b508e0ca532980000000000000000000000000a258c4606ca8206d8aa700ce2143d7db854d168c","to":"0x062bf725dc4cdf947aa79ca2aaccd4f385b13b5c"},"latest"]}
 
     dataString = '0x4bd21445000000000000000000000000' + address[2:] + '000000000000000000000000' + vault[2:]
     blockNumber = 'latest'
 
-    rpcData = rpcCall(alchemist, dataString, blockNumber, chain)
+    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session)
     #print(rpcData)
     balance = int(rpcData[:66], 16)
     
     return balance
+
+def run_chain(chain_info, chain_label, chain_id):
+    """Run full chain logic (alchemists -> vaults -> parallel balance calls). Returns list of balance dicts."""
+    session = requests.Session()
+    chain_balances = []
+    for alchemist in chain_info['alchemists']:
+        print(chain_label)
+        print('Alchemist: ' + alchemist['name'])
+        addresses = getQuery(chain_info['queryID'])
+        for vault in alchemist['vaults']:
+            print('Vault: ' + vault['name'])
+            dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:]
+            underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
+            dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
+            yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
+
+            address_to_balance = {}
+            with ThreadPoolExecutor(max_workers=BALANCE_WORKERS) as executor:
+                future_to_address = {
+                    executor.submit(getBalances, addr['address'], alchemist['address'], vault['address'], chain_id, session): addr
+                    for addr in addresses
+                }
+                for future in as_completed(future_to_address):
+                    addr = future_to_address[future]
+                    try:
+                        balance = future.result()
+                        address_to_balance[addr['address']] = balance
+                    except Exception:
+                        address_to_balance[addr['address']] = 0
+
+            secondCounter = 0
+            for address in addresses:
+                balance = address_to_balance.get(address['address'], 0)
+                if balance > 0:
+                    tempBalance = {
+                        'address': address['address'],
+                        'yieldToken': vault['name'],
+                        'yieldTokenAddress': vault['address'],
+                        'alchemist': alchemist['name'],
+                        'alchemistAddress': alchemist['address'],
+                        'shares': balance,
+                        'underlyingTokensPerShare': underlyingTokensPerShare,
+                        'yieldTokensPerShare': yieldTokensPerShare
+                    }
+                    chain_balances.append(tempBalance)
+                    secondCounter += 1
+                if secondCounter >= 100:
+                    break
+        print('--------------------------------')
+    return chain_balances
 
 mainnetInfo = {
     'queryID': 6475554, # dune query with all depositor addresses
@@ -184,163 +239,23 @@ arbitrumInfo = {
     ]
 }
 
-mainnetBalances = []
-for alchemist in mainnetInfo['alchemists']:
-    counter = 0
-    print('Mainnet')
-    print('Alchemist: ' + alchemist['name'])
-    
-    addresses = getQuery(mainnetInfo['queryID'])
-    #addresses = updateQuery(optimismInfo['queryID'])
-    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
-    
-    for vault in alchemist['vaults']:
-        print('Vault: ' + vault['name'])    
-        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
-        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'eth'), 16)
-        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
-
-        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
-        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'eth'), 16)
-        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
-
-        secondCounter = 0
-        for address in addresses:
-            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'eth')
-            print('Balance: ' + str(balance))
-            
-            if balance > 0:
-                tempBalance = {
-                    'address': address['address'],
-                    'yieldToken': vault['name'],
-                    'yieldTokenAddress': vault['address'],
-                    'alchemist': alchemist['name'],
-                    'alchemistAddress': alchemist['address'],
-                    'shares': balance,
-                    'underlyingTokensPerShare': underlyingTokensPerShare,
-                    'yieldTokensPerShare': yieldTokensPerShare
-                }
-                mainnetBalances.append(tempBalance)
-                secondCounter += 1
-
-            if secondCounter >= 100:
-                break
-
-        #counter += 1
-        
-        #if counter >= 1:
-        #    break
-    print('--------------------------------')
+with ThreadPoolExecutor(max_workers=3) as chain_executor:
+    mainnet_future = chain_executor.submit(run_chain, mainnetInfo, 'Mainnet', 'eth')
+    optimism_future = chain_executor.submit(run_chain, optimismInfo, 'Optimism', 'op')
+    arbitrum_future = chain_executor.submit(run_chain, arbitrumInfo, 'Arbitrum', 'arb')
+    mainnetBalances = mainnet_future.result()
+    optimismBalances = optimism_future.result()
+    arbitrumBalances = arbitrum_future.result()
 
 print('Saving to CSV...')
 df = pd.DataFrame(mainnetBalances)
 df.to_csv('MainnetBalances-long_script.csv', index=False)
 print('Saved to CSV')
 
-
-optimismBalances = []
-for alchemist in optimismInfo['alchemists']:
-    counter = 0
-    print('Optimism')
-    print('Alchemist: ' + alchemist['name'])
-    
-    addresses = getQuery(optimismInfo['queryID'])
-    #addresses = updateQuery(optimismInfo['queryID'])
-    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
-    
-    for vault in alchemist['vaults']:
-        print('Vault: ' + vault['name'])    
-        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
-        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'op'), 16)
-        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
-
-        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
-        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'op'), 16)
-        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
-
-        secondCounter = 0
-        for address in addresses:
-            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'op')
-            print('Balance: ' + str(balance))
-
-            if balance > 0:
-                tempBalance = {
-                    'address': address['address'],
-                    'yieldToken': vault['name'],
-                    'yieldTokenAddress': vault['address'],
-                    'alchemist': alchemist['name'],
-                    'alchemistAddress': alchemist['address'],
-                    'shares': balance,
-                    'underlyingTokensPerShare': underlyingTokensPerShare,
-                    'yieldTokensPerShare': yieldTokensPerShare
-                }
-                optimismBalances.append(tempBalance)
-                secondCounter += 1
-
-            if secondCounter >= 100:
-                break
-
-        #counter += 1
-        
-        #if counter >= 1:
-        #    break
-
-    print('--------------------------------')
-
 print('Saving to CSV...')
 df = pd.DataFrame(optimismBalances)
 df.to_csv('OptimismBalances-long_script.csv', index=False)
 print('Saved to CSV')
-
-
-arbitrumBalances = []
-for alchemist in arbitrumInfo['alchemists']:
-    counter = 0
-    print('Arbitrum')
-    print('Alchemist: ' + alchemist['name'])
-    
-    addresses = getQuery(arbitrumInfo['queryID'])
-    #addresses = updateQuery(optimismInfo['queryID'])
-    ######### COMMENT OUT THE getQuery() LINE AND UNCOMMENT THE updateQuery() LINE WHEN READY FOR PROD
-    
-    for vault in alchemist['vaults']:
-        print('Vault: ' + vault['name'])    
-        dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:] 
-        underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'arb'), 16)
-        print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
-
-        dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
-        yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', 'arb'), 16)
-        print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))    
-
-        secondCounter = 0
-        for address in addresses:
-            balance = getBalances(address['address'], alchemist['address'], vault['address'], 'arb')
-            print('Balance: ' + str(balance))
-            
-            if balance > 0:
-                tempBalance = {
-                    'address': address['address'],
-                    'yieldToken': vault['name'],
-                    'yieldTokenAddress': vault['address'],
-                    'alchemist': alchemist['name'],
-                    'alchemistAddress': alchemist['address'],
-                    'shares': balance,
-                    'underlyingTokensPerShare': underlyingTokensPerShare,
-                    'yieldTokensPerShare': yieldTokensPerShare
-                }
-                arbitrumBalances.append(tempBalance)
-                secondCounter += 1
-
-            if secondCounter >= 100:
-                break
-
-        #counter += 1
-        
-        #if counter >= 1:
-        #    break
-
-    print('--------------------------------')
 
 print('Saving to CSV...')
 df = pd.DataFrame(arbitrumBalances)
