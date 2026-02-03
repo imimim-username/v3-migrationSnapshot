@@ -11,6 +11,8 @@ The project provides two main approaches for snapshotting user balances:
 
 Both scripts generate CSV files with balance snapshots for Mainnet, Optimism, and Arbitrum networks.
 
+**End-to-end pipeline:** **allScripts.py** runs the full Dune-based pipeline by executing three component scripts in sequence: `duneApp.py` → `sum.py` → `getDebts.py`. Each script consumes the outputs of the previous one (see [Pipeline (allScripts.py)](#pipeline-allscriptspy) and [Scripts](#scripts) below).
+
 ## Setup
 
 1. Create a virtual environment:
@@ -67,12 +69,29 @@ This will generate:
 - `OptimismBalances-long_script.csv`
 - `ArbitrumBalances-long_script.csv`
 
+### Pipeline (allScripts.py)
+
+To run the full Dune-based pipeline in one go (balances → aggregation → debt lookup), use:
+
+```bash
+python allScripts.py
+```
+
+This runs the following scripts **in sequence** (each step uses the previous step’s outputs):
+
+1. **duneApp.py** – Fetches balances via Dune + RPC; writes `MainnetBalances-long_script.csv`, `OptimismBalances-long_script.csv`, `ArbitrumBalances-long_script.csv`.
+2. **sum.py** – Reads those CSVs, normalizes and aggregates by address/alchemist; writes `alEthValues-pivot-{mainnet,optimism,arbitrum}.csv` and `alUsdValues-pivot-{mainnet,optimism,arbitrum}.csv`.
+3. **getDebts.py** – Reads the pivot CSVs, fetches debt per address via RPC, and writes `alEthValues-sum-and-debt-{mainnet,optimism,arbitrum}.csv` and `alUsdValues-sum-and-debt-{mainnet,optimism,arbitrum}.csv`.
+
 ## Scripts
 
-- **app.py** - Main script using The Graph API method
-- **duneApp.py** - Main script using Dune Analytics + RPC method
-- **rpcCall.py** - Utility module for making RPC calls to blockchain networks
-- **runDuneQuery.py** - Utility module for interacting with Dune Analytics API
+- **allScripts.py** – Runs the full pipeline by executing `duneApp.py` → `sum.py` → `getDebts.py` in order. Use this for a single command that produces the final sum-and-debt CSVs.
+- **app.py** – Standalone script using The Graph API (writes `MainnetBalances.csv`, etc.; not part of the allScripts pipeline).
+- **duneApp.py** – Fetches depositor addresses from Dune, then RPC balance data per vault; writes the `*-long_script.csv` balance files for Mainnet, Optimism, and Arbitrum.
+- **sum.py** – Reads the `*-long_script.csv` files, computes underlying balances (alETH/alUSD), filters by minimum value, and outputs pivot CSVs (`alEthValues-pivot-*.csv`, `alUsdValues-pivot-*.csv`) per chain.
+- **getDebts.py** – Reads the pivot CSVs, fetches each address’s debt from the alchemist contracts via RPC, and saves the result as `*-sum-and-debt-*.csv` (same names with `sum-and-debt` instead of `pivot`).
+- **rpcCall.py** – Utility module for making RPC calls to blockchain networks.
+- **runDuneQuery.py** – Utility module for interacting with the Dune Analytics API.
 
 ## Output
 
