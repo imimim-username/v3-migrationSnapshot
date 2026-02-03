@@ -1,8 +1,12 @@
 #gets debts.
-import requests
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
+from rpcCall import rpcCall  # (targetAddress, dataString, blockNumber, chain)
+
+MAX_WORKERS = 10
+PROGRESS_EVERY = 10
+MAX_ROWS = None  # set to e.g. 5 for a quick test
 
 startingFiles = {
     'eth': {
@@ -34,23 +38,44 @@ alchemistAddresses = {
     }
 }
 
+
+def fetch_debt(task):
+    """Worker: takes (index, address, chain, vault), returns (index, debt). On RPC failure returns (index, None)."""
+    index, address, chain, vault = task
+    address_hex = address[2:] if address.startswith('0x') else address
+    data_string = '0x5e5c06e2000000000000000000000000' + address_hex
+    try:
+        result = rpcCall(alchemistAddresses[chain][vault], data_string, 'latest', chain)
+        debt = int(result[:66], 16)
+        return (index, debt)
+    except Exception:
+        return (index, None)
+
+
 for chain, files in startingFiles.items():
     for vault, fileName in files.items():
         df = pd.read_csv(fileName)
-        print(df.head())
+        if 'debt' not in df.columns:
+            df['debt'] = pd.NA
 
-        counter = 0
-        
-        for index, row in df.iterrows():
-            address = row['address'][2:]
-            
-            debt = int(rpcCall(alchemistAddresses[chain][vault], '0x5e5c06e2000000000000000000000000' + address, 'latest', chain)[:66], 16)
-            print(debt)
-            df.loc[index, "debt"] = debt
-            counter += 1
-            
-            if counter >= 5:
-                break
+        rows = list(df.iterrows())
+        if MAX_ROWS is not None:
+            rows = rows[:MAX_ROWS]
+        tasks = [(index, row['address'], chain, vault) for index, row in rows]
+        total = len(tasks)
+
+        print(f"Starting {chain}/{vault} ({total} rows)...")
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(fetch_debt, t): t for t in tasks}
+            completed = 0
+            for future in as_completed(futures):
+                index, debt = future.result()
+                df.loc[index, 'debt'] = debt
+                completed += 1
+                if completed % PROGRESS_EVERY == 0 or completed == total:
+                    pct = (100 * completed // total) if total else 0
+                    print(f"[{chain}/{vault}] {completed} / {total} ({pct}%)")
+        print(f"Done {chain}/{vault}.")
 
         newFileName = fileName.replace('pivot-', 'sum-and-debt-')
         df.to_csv(newFileName, index=False)
