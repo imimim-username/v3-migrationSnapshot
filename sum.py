@@ -120,4 +120,8 @@ for chain, df in originDataFrames.items():
     alusdPivotDf = alUsdFilterAndPivot(alusdDf)
     print(alusdPivotDf.head())
 
+    fileName = 'alUsdValues-' + chain + '.csv'
+    print(f"Saving {fileName}...")
+    alusdPivotDf.to_csv(fileName, index=False)
+    print(f"Saved {fileName}")
     
