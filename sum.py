@@ -11,7 +11,7 @@ def alEthUnderlyingBalances(inputDf):
     inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int)
 
     
-    inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] // 1e18
+    inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] / 1e18
 
     """
     pivotDf = (
@@ -55,7 +55,7 @@ def normalizeAlusdBalances(inputDf, chain):
     mask_6 = inputDf["yieldToken"].isin(six_list) 
     product = inputDf["shares"] * inputDf["underlyingTokensPerShare"] 
     divisor = np.where(mask_6, 10**6, 10**18) 
-    inputDf["underlyingValue"] = product // divisor 
+    inputDf["underlyingValue"] = product / divisor 
 
     mask_fix = mask_6 | (inputDf["yieldToken"] == weirdo)
     inputDf.loc[mask_fix, "underlyingValue"] = inputDf.loc[mask_fix, "underlyingValue"] * 10**12
@@ -111,7 +111,7 @@ for chain, df in originDataFrames.items():
     alethPivotDf = alEthFilterAndPivot(alethDf)
     print(alethPivotDf.head())
 
-    fileName = 'alEthValues-' + chain + '.csv'
+    fileName = 'alEthValues-pivot-' + chain + '.csv'
     print(f"Saving {fileName}...")
     alethPivotDf.to_csv(fileName, index=False)
     print(f"Saved {fileName}")
@@ -120,7 +120,7 @@ for chain, df in originDataFrames.items():
     alusdPivotDf = alUsdFilterAndPivot(alusdDf)
     print(alusdPivotDf.head())
 
-    fileName = 'alUsdValues-' + chain + '.csv'
+    fileName = 'alUsdValues-pivot-' + chain + '.csv'
     print(f"Saving {fileName}...")
     alusdPivotDf.to_csv(fileName, index=False)
     print(f"Saved {fileName}")
