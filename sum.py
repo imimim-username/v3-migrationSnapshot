@@ -2,12 +2,13 @@
 #also normalize all balances to be 18 decimals
 
 import pandas as pd
+import numpy as np
 
 def alEthUnderlyingBalances(inputDf):
     # returns a dataframe of aleth DFs that includes the underlying balances
 
-    inputDf["shares"] = df["shares"].map(int)
-    inputDf["underlyingTokensPerShare"] = df["underlyingTokensPerShare"].map(int)
+    inputDf["shares"] = inputDf["shares"].map(int)
+    inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int)
 
     
     inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] / 1e18
@@ -37,6 +38,26 @@ def alEthFilterAndPivot(inputDf):
     
     return pivotDf
 
+def normalizeAlusdBalances(inputDf, chain): 
+    # normalizes all balances to be 18 decimals 
+
+    sixDecimals = { 
+        'mainnet': ['yvUSDC', 'yvUSDT', 'aUSDC', 'aUSDT'], 
+        'optimism': ['aUSDC', 'aUSDT', 'ysUSDC'], 
+        'arbitrum': ['aUSDC'] 
+    } 
+    weirdo = 'vaUSDC' 
+
+    inputDf["shares"] = inputDf["shares"].map(int) 
+    inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int) 
+
+    six_list = sixDecimals.get(chain, []) 
+    mask_6 = inputDf["yieldToken"].isin(six_list) 
+    product = inputDf["shares"] * inputDf["underlyingTokensPerShare"] 
+    divisor = np.where(mask_6, 10**6, 10**18) 
+    inputDf["underlyingValue"] = product / divisor 
+
+    return inputDf
 
 originFiles = {
     'mainnet': 'MainnetBalances-long_script.csv',
@@ -51,14 +72,6 @@ originDataFrames = {
 }
 
 
-sixDecimals = {
-    'mainnet': ['yvUSDC', 'yvUSDT', 'aUSDC', 'aUSDT'],
-    'optimism': ['aUSDC', 'aUSDT', 'ysUSDC'],
-    'arbitrum': ['aUSDC']
-}
-
-
-weirdo = 'vaUSDC'
 
 for chain, df in originDataFrames.items():
     '''
@@ -84,4 +97,13 @@ for chain, df in originDataFrames.items():
     fileName = 'alEthValues-' + chain + '.csv'
     print(f"Saving {fileName}...")
     alethPivotDf.to_csv(fileName, index=False)
+    print(f"Saved {fileName}")
+
+    alusdDf = normalizeAlusdBalances(alusdDf, chain)
+    alusdPivotDf = alEthFilterAndPivot(alusdDf)
+    print(alusdPivotDf.head())
+
+    fileName = 'alusdValues-' + chain + '.csv'
+    print(f"Saving {fileName}...")
+    alusdPivotDf.to_csv(fileName, index=False)
     print(f"Saved {fileName}")
