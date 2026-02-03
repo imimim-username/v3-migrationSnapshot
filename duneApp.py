@@ -28,7 +28,8 @@ def run_chain(chain_info, chain_label, chain_id):
     for alchemist in chain_info['alchemists']:
         print(chain_label)
         print('Alchemist: ' + alchemist['name'])
-        addresses = getQuery(chain_info['queryID'])
+        #addresses = getQuery(chain_info['queryID'])
+        addresses = updateQuery(chain_info['queryID'])
         for vault in alchemist['vaults']:
             print('Vault: ' + vault['name'])
             dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:]
