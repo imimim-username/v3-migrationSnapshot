@@ -179,7 +179,7 @@ def buildBalances(url):
 
     return balances
 
-
+""" 
 mainnetGraphURL = 'https://gateway-arbitrum.network.thegraph.com/api/' + graphApiKey + '/subgraphs/id/GJ9CJ66TgbJnXcXGuZiSYAdGNkJBAwqMcKHEvfVmCkdG'
 print('Getting mainnet balances...')
 try:
@@ -207,7 +207,7 @@ except Exception as e:
     print(f"Error processing optimism balances: {e}")
     import traceback
     traceback.print_exc()
-
+"""
 
 arbitrumGraphURL = 'https://gateway-arbitrum.network.thegraph.com/api/' + graphApiKey + '/subgraphs/id/Dgjyhh69XooHPd4JjvT3ik9FaGAR3w7sUSQyQ1YDakGp'
 print('Getting arbitrum balances...')

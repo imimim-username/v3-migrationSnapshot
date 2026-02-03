@@ -221,10 +221,10 @@ for alchemist in mainnetInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 mainnetBalances.append(tempBalance)
-            #secondCounter += 1
+                secondCounter += 1
 
-            #if secondCounter >= 1:
-            #    break
+            if secondCounter >= 100:
+                break
 
         #counter += 1
         
@@ -275,10 +275,10 @@ for alchemist in optimismInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 optimismBalances.append(tempBalance)
-            #secondCounter += 1
+                secondCounter += 1
 
-            #if secondCounter >= 1:
-            #    break
+            if secondCounter >= 100:
+                break
 
         #counter += 1
         
@@ -330,10 +330,10 @@ for alchemist in arbitrumInfo['alchemists']:
                     'yieldTokensPerShare': yieldTokensPerShare
                 }
                 arbitrumBalances.append(tempBalance)
-            #  secondCounter += 1
+                secondCounter += 1
 
-            #if secondCounter >= 1:
-            #    break
+            if secondCounter >= 100:
+                break
 
         #counter += 1
         
