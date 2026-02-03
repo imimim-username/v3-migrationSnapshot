@@ -13,6 +13,7 @@ def rpcCall (targetAddress, dataString, blockNumber, chain):
     alchemy_key = os.getenv("ALCHEMY_API_KEY")
     #print('Alchemy key: ' + alchemy_key)
 
+    """
     match chain:
         case 'eth':
             apiString = 'https://eth-mainnet.g.alchemy.com/v2/' + alchemy_key
@@ -22,7 +23,18 @@ def rpcCall (targetAddress, dataString, blockNumber, chain):
             apiString = 'https://arb-mainnet.g.alchemy.com/v2/' + alchemy_key
         case 'lin':
             apiString = 'https://linea-mainnet.g.alchemy.com/v2/' + alchemy_key
+    """
 
+    match chain:
+        case 'eth':
+            apiString = 'https://lb.drpc.live/ethereum/' + alchemy_key
+        case 'op':
+            apiString = 'https://lb.drpc.live/optimism/' + alchemy_key
+        case 'arb':
+            apiString = 'https://lb.drpc.live/arbitrum/' + alchemy_key
+        case 'lin':
+            apiString = 'https://lb.drpc.live/linea/' + alchemy_key
+    
     headers = {
         "Content-Type": "application/json",
     }
