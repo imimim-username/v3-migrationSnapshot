@@ -39,8 +39,19 @@ for chain, files in startingFiles.items():
         df = pd.read_csv(fileName)
         print(df.head())
 
+        counter = 0
+        
         for index, row in df.iterrows():
             address = row['address'][2:]
             
             debt = int(rpcCall(alchemistAddresses[chain][vault], '0x5e5c06e2000000000000000000000000' + address, 'latest', chain)[:66], 16)
             print(debt)
+            df.loc[index, "debt"] = debt
+            counter += 1
+            
+            if counter >= 5:
+                break
+
+        newFileName = fileName.replace('pivot-', 'sum-and-debt-')
+        df.to_csv(newFileName, index=False)
+        print(f"Saved {newFileName}")
