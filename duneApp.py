@@ -57,7 +57,7 @@ def run_chain(chain_info, chain_label, chain_id):
                     except Exception:
                         address_to_balance[addr['address']] = 0
 
-            secondCounter = 0
+            #secondCounter = 0
             for address in addresses:
                 balance = address_to_balance.get(address['address'], 0)
                 if balance > 0:
@@ -72,9 +72,9 @@ def run_chain(chain_info, chain_label, chain_id):
                         'yieldTokensPerShare': yieldTokensPerShare
                     }
                     chain_balances.append(tempBalance)
-                    secondCounter += 1
-                if secondCounter >= 100:
-                    break
+                    #secondCounter += 1
+                #if secondCounter >= 100:
+                #    break
         print('--------------------------------')
     return chain_balances
 
