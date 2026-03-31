@@ -2,6 +2,9 @@ from dotenv import load_dotenv
 import os
 import requests
 import pandas as pd
+import threading
+import time
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from runDuneQuery import updateQuery, getQuery #(inputID)
@@ -9,59 +12,80 @@ from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
 
 BALANCE_WORKERS = 50
 
-def getBalances(address, alchemist, vault, chain, session=None, progress_chain_label=None, progress_vault_name=None, progress_current=None, progress_total=None):
+def ts():
+    return datetime.now().strftime('%H:%M:%S')
+
+def getBalances(address, alchemist, vault, chain, session=None):
 # example: {"jsonrpc":"2.0","id":7189484897142231,"method":"eth_call","params":[{"from":"0x0000000000000000000000000000000000000000","data":"0x4bd214450000000000000000000000002330eb2d92167c3b6b22690c03b508e0ca532980000000000000000000000000a258c4606ca8206d8aa700ce2143d7db854d168c","to":"0x062bf725dc4cdf947aa79ca2aaccd4f385b13b5c"},"latest"]}
 
     dataString = '0x4bd21445000000000000000000000000' + address[2:] + '000000000000000000000000' + vault[2:]
     blockNumber = 'latest'
 
-    progress_prefix = None
-    if progress_chain_label is not None and progress_vault_name is not None and progress_current is not None and progress_total is not None:
-        progress_prefix = f"{progress_chain_label} | {progress_vault_name} | {progress_current}/{progress_total}"
-    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session, progress_prefix=progress_prefix)
-    #print(rpcData)
+    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session)
     balance = int(rpcData[:66], 16)
-    
+
     return balance
+
+_print_lock = threading.Lock()
+
+def log(msg):
+    with _print_lock:
+        print(f'[{ts()}] {msg}', flush=True)
 
 def run_chain(chain_info, chain_label, chain_id):
     """Run full chain logic (alchemists -> vaults -> parallel balance calls). Returns list of balance dicts."""
     session = requests.Session()
     chain_balances = []
     for alchemist in chain_info['alchemists']:
-        print(chain_label)
-        print('Alchemist: ' + alchemist['name'])
-        #addresses = getQuery(chain_info['queryID'])
+        log(f'{chain_label} | Alchemist: {alchemist["name"]} | Fetching Dune addresses (queryID={chain_info["queryID"]})...')
+        t_dune = time.perf_counter()
         addresses = updateQuery(chain_info['queryID'])
+        log(f'{chain_label} | Alchemist: {alchemist["name"]} | Dune returned {len(addresses)} addresses in {int(time.perf_counter()-t_dune)}s')
+
         for vault in alchemist['vaults']:
-            print('Vault: ' + vault['name'])
+            log(f'{chain_label} | {alchemist["name"]} | Vault: {vault["name"]} | Fetching per-share rates...')
             dataStr = '0x88e6f15a000000000000000000000000' + vault['address'][2:]
-            underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session, progress_prefix=f"{chain_label} | {vault['name']} | underlying per share"), 16)
-            print('Underlying Tokens Per Share: ' + str(underlyingTokensPerShare))
+            underlyingTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            log(f'{chain_label} | {vault["name"]} | underlyingTokensPerShare = {underlyingTokensPerShare}')
+
             dataStr = '0xa9aa5228000000000000000000000000' + vault['address'][2:]
-            yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session, progress_prefix=f"{chain_label} | {vault['name']} | yield per share"), 16)
-            print('Yield Tokens Per Share: ' + str(yieldTokensPerShare))
+            yieldTokensPerShare = int(rpcCall(alchemist['address'], dataStr, 'latest', chain_id, session=session), 16)
+            log(f'{chain_label} | {vault["name"]} | yieldTokensPerShare = {yieldTokensPerShare}')
+
+            total_addresses = len(addresses)
+            log(f'{chain_label} | {vault["name"]} | Fetching balances for {total_addresses} addresses ({BALANCE_WORKERS} workers)...')
+            t_bal = time.perf_counter()
+
+            # Thread-safe progress counter
+            completed = [0]
+            errors = [0]
 
             address_to_balance = {}
-            total_addresses = len(addresses)
             with ThreadPoolExecutor(max_workers=BALANCE_WORKERS) as executor:
                 future_to_address = {
-                    executor.submit(getBalances, addr['address'], alchemist['address'], vault['address'], chain_id, session, chain_label, vault['name'], i + 1, total_addresses): addr
-                    for i, addr in enumerate(addresses)
+                    executor.submit(getBalances, addr['address'], alchemist['address'], vault['address'], chain_id, session): addr
+                    for addr in addresses
                 }
                 for future in as_completed(future_to_address):
                     addr = future_to_address[future]
                     try:
                         balance = future.result()
                         address_to_balance[addr['address']] = balance
-                    except Exception:
+                    except Exception as e:
                         address_to_balance[addr['address']] = 0
+                        errors[0] += 1
+                    completed[0] += 1
+                    if completed[0] % 50 == 0 or completed[0] == total_addresses:
+                        log(f'{chain_label} | {vault["name"]} | Balances: {completed[0]}/{total_addresses} done'
+                            + (f' ({errors[0]} errors)' if errors[0] else ''))
 
-            #secondCounter = 0
+            nonzero = sum(1 for b in address_to_balance.values() if b > 0)
+            log(f'{chain_label} | {vault["name"]} | Done in {int(time.perf_counter()-t_bal)}s — {nonzero}/{total_addresses} addresses have non-zero balance')
+
             for address in addresses:
                 balance = address_to_balance.get(address['address'], 0)
                 if balance > 0:
-                    tempBalance = {
+                    chain_balances.append({
                         'address': address['address'],
                         'yieldToken': vault['name'],
                         'yieldTokenAddress': vault['address'],
@@ -70,12 +94,9 @@ def run_chain(chain_info, chain_label, chain_id):
                         'shares': balance,
                         'underlyingTokensPerShare': underlyingTokensPerShare,
                         'yieldTokensPerShare': yieldTokensPerShare
-                    }
-                    chain_balances.append(tempBalance)
-                    #secondCounter += 1
-                #if secondCounter >= 100:
-                #    break
-        print('--------------------------------')
+                    })
+
+        log(f'{chain_label} | ── All alchemists complete ──')
     return chain_balances
 
 mainnetInfo = {
@@ -244,6 +265,7 @@ arbitrumInfo = {
     ]
 }
 
+log('Launching Mainnet, Optimism, and Arbitrum chains in parallel...')
 with ThreadPoolExecutor(max_workers=3) as chain_executor:
     mainnet_future = chain_executor.submit(run_chain, mainnetInfo, 'Mainnet', 'eth')
     optimism_future = chain_executor.submit(run_chain, optimismInfo, 'Optimism', 'op')
@@ -252,20 +274,18 @@ with ThreadPoolExecutor(max_workers=3) as chain_executor:
     optimismBalances = optimism_future.result()
     arbitrumBalances = arbitrum_future.result()
 
-print('Saving to CSV...')
+log(f'All chains complete. Saving CSVs...')
 df = pd.DataFrame(mainnetBalances)
 df.to_csv('MainnetBalances-long_script.csv', index=False)
-print('Saved to CSV')
+log(f'Saved MainnetBalances-long_script.csv ({len(df)} rows)')
 
-print('Saving to CSV...')
 df = pd.DataFrame(optimismBalances)
 df.to_csv('OptimismBalances-long_script.csv', index=False)
-print('Saved to CSV')
+log(f'Saved OptimismBalances-long_script.csv ({len(df)} rows)')
 
-print('Saving to CSV...')
 df = pd.DataFrame(arbitrumBalances)
 df.to_csv('ArbitrumBalances-long_script.csv', index=False)
-print('Saved to CSV')
+log(f'Saved ArbitrumBalances-long_script.csv ({len(df)} rows)')
 
 #test = getBalances('0x2330eB2d92167c3b6B22690c03b508E0CA532980', '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', '0xa258c4606ca8206d8aa700ce2143d7db854d168c', 'eth')
 

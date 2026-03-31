@@ -53,13 +53,11 @@ def rpcCall (targetAddress, dataString, blockNumber, chain, session=None, progre
     }
 
     if progress_prefix is not None:
-        print(progress_prefix)
-    print('Result:')
+        print(f'  → {progress_prefix}')
     if session is not None:
-        rpcData = session.post(apiString, headers=headers, data=json.dumps(payload))
+        rpcData = session.post(apiString, headers=headers, data=json.dumps(payload), timeout=30)
     else:
-        rpcData = requests.post(apiString, headers=headers, data=json.dumps(payload))
-    print(rpcData.text)
+        rpcData = requests.post(apiString, headers=headers, data=json.dumps(payload), timeout=30)
     rpcData = rpcData.json()
 
     return rpcData['result']
