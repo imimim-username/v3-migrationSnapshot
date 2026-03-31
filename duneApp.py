@@ -11,6 +11,8 @@ from runDuneQuery import updateQuery, getQuery #(inputID)
 from rpcCall import rpcCall #(targetAddress, dataString, blockNumber, chain)
 
 BALANCE_WORKERS = 50
+RPC_RETRIES = 3        # attempts per address before giving up
+RPC_RETRY_DELAY = 2.0  # seconds between retries (doubles each attempt)
 
 def ts():
     return datetime.now().strftime('%H:%M:%S')
@@ -21,10 +23,17 @@ def getBalances(address, alchemist, vault, chain, session=None):
     dataString = '0x4bd21445000000000000000000000000' + address[2:] + '000000000000000000000000' + vault[2:]
     blockNumber = 'latest'
 
-    rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session)
-    balance = int(rpcData[:66], 16)
-
-    return balance
+    last_exc = None
+    for attempt in range(1, RPC_RETRIES + 1):
+        try:
+            rpcData = rpcCall(alchemist, dataString, blockNumber, chain, session=session)
+            return int(rpcData[:66], 16)
+        except Exception as e:
+            last_exc = e
+            if attempt < RPC_RETRIES:
+                time.sleep(RPC_RETRY_DELAY * attempt)  # 2s, 4s backoff
+    # All retries exhausted — raise so the caller knows this address is missing
+    raise RuntimeError(f'RPC failed for {address} after {RPC_RETRIES} attempts: {last_exc}')
 
 _print_lock = threading.Lock()
 
@@ -58,7 +67,7 @@ def run_chain(chain_info, chain_label, chain_id):
 
             # Thread-safe progress counter
             completed = [0]
-            errors = [0]
+            failed_addresses = []
 
             address_to_balance = {}
             with ThreadPoolExecutor(max_workers=BALANCE_WORKERS) as executor:
@@ -72,12 +81,22 @@ def run_chain(chain_info, chain_label, chain_id):
                         balance = future.result()
                         address_to_balance[addr['address']] = balance
                     except Exception as e:
-                        address_to_balance[addr['address']] = 0
-                        errors[0] += 1
+                        failed_addresses.append((addr['address'], str(e)))
                     completed[0] += 1
                     if completed[0] % 50 == 0 or completed[0] == total_addresses:
                         log(f'{chain_label} | {vault["name"]} | Balances: {completed[0]}/{total_addresses} done'
-                            + (f' ({errors[0]} errors)' if errors[0] else ''))
+                            + (f' — ⚠ {len(failed_addresses)} failed so far' if failed_addresses else ''))
+
+            if failed_addresses:
+                log(f'')
+                log(f'FATAL: {chain_label} | {vault["name"]} | {len(failed_addresses)} addresses failed after all retries. Data is incomplete — aborting.')
+                log(f'Failed addresses:')
+                for fa_addr, fa_err in failed_addresses:
+                    log(f'  {fa_addr}: {fa_err}')
+                raise RuntimeError(
+                    f'{chain_label} | {vault["name"]}: {len(failed_addresses)} RPC calls failed permanently. '
+                    f'Dataset would be incomplete. Fix the connection issue and re-run.'
+                )
 
             nonzero = sum(1 for b in address_to_balance.values() if b > 0)
             log(f'{chain_label} | {vault["name"]} | Done in {int(time.perf_counter()-t_bal)}s — {nonzero}/{total_addresses} addresses have non-zero balance')
