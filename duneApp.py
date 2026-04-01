@@ -294,15 +294,26 @@ with ThreadPoolExecutor(max_workers=3) as chain_executor:
     arbitrumBalances = arbitrum_future.result()
 
 log(f'All chains complete. Saving CSVs...')
+int_columns = ['shares', 'underlyingTokensPerShare', 'yieldTokensPerShare']
+
 df = pd.DataFrame(mainnetBalances)
+for col in int_columns:
+    if col in df.columns:
+        df[col] = df[col].map(lambda x: str(int(x)))
 df.to_csv('MainnetBalances-long_script.csv', index=False)
 log(f'Saved MainnetBalances-long_script.csv ({len(df)} rows)')
 
 df = pd.DataFrame(optimismBalances)
+for col in int_columns:
+    if col in df.columns:
+        df[col] = df[col].map(lambda x: str(int(x)))
 df.to_csv('OptimismBalances-long_script.csv', index=False)
 log(f'Saved OptimismBalances-long_script.csv ({len(df)} rows)')
 
 df = pd.DataFrame(arbitrumBalances)
+for col in int_columns:
+    if col in df.columns:
+        df[col] = df[col].map(lambda x: str(int(x)))
 df.to_csv('ArbitrumBalances-long_script.csv', index=False)
 log(f'Saved ArbitrumBalances-long_script.csv ({len(df)} rows)')
 

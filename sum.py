@@ -2,16 +2,26 @@
 #also normalize all balances to be 18 decimals
 
 import pandas as pd
-import numpy as np
+
+
+def parse_int_columns(inputDf, columns):
+    for col in columns:
+        if col in inputDf.columns:
+            inputDf[col] = inputDf[col].map(lambda x: int(str(x)))
+    return inputDf
+
+
+def stringify_int_columns(inputDf, columns):
+    for col in columns:
+        if col in inputDf.columns:
+            inputDf[col] = inputDf[col].map(lambda x: str(int(x)))
+    return inputDf
 
 def alEthUnderlyingBalances(inputDf):
     # returns a dataframe of aleth DFs that includes the underlying balances
 
-    inputDf["shares"] = inputDf["shares"].map(int)
-    inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int)
-
-    
-    inputDf['underlyingValue'] = inputDf['shares'] * inputDf['underlyingTokensPerShare'] / 1e18
+    parse_int_columns(inputDf, ["shares", "underlyingTokensPerShare"])
+    inputDf["underlyingValue"] = (inputDf["shares"] * inputDf["underlyingTokensPerShare"]).map(lambda x: x // 10**18)
 
     """
     pivotDf = (
@@ -48,17 +58,16 @@ def normalizeAlusdBalances(inputDf, chain):
     } 
     weirdo = 'vaUSDC' 
 
-    inputDf["shares"] = inputDf["shares"].map(int) 
-    inputDf["underlyingTokensPerShare"] = inputDf["underlyingTokensPerShare"].map(int) 
+    parse_int_columns(inputDf, ["shares", "underlyingTokensPerShare"])
 
     six_list = sixDecimals.get(chain, []) 
-    mask_6 = inputDf["yieldToken"].isin(six_list) 
-    product = inputDf["shares"] * inputDf["underlyingTokensPerShare"] 
-    divisor = np.where(mask_6, 10**6, 10**18) 
-    inputDf["underlyingValue"] = product / divisor 
+    six_set = set(six_list)
+    product = inputDf["shares"] * inputDf["underlyingTokensPerShare"]
+    divisors = inputDf["yieldToken"].map(lambda token: 10**6 if token in six_set else 10**18)
+    inputDf["underlyingValue"] = [p // d for p, d in zip(product, divisors)]
 
-    mask_fix = mask_6 | (inputDf["yieldToken"] == weirdo)
-    inputDf.loc[mask_fix, "underlyingValue"] = inputDf.loc[mask_fix, "underlyingValue"] * 10**12
+    mask_fix = inputDf["yieldToken"].isin(six_set | {weirdo})
+    inputDf.loc[mask_fix, "underlyingValue"] = inputDf.loc[mask_fix, "underlyingValue"].map(lambda x: x * 10**12)
 
     return inputDf
 
@@ -83,9 +92,9 @@ originFiles = {
 }
 
 originDataFrames = {
-    'mainnet': pd.read_csv(originFiles['mainnet']),
-    'optimism': pd.read_csv(originFiles['optimism']),
-    'arbitrum': pd.read_csv(originFiles['arbitrum']),
+    'mainnet': pd.read_csv(originFiles['mainnet'], dtype={'shares': 'string', 'underlyingTokensPerShare': 'string', 'yieldTokensPerShare': 'string'}),
+    'optimism': pd.read_csv(originFiles['optimism'], dtype={'shares': 'string', 'underlyingTokensPerShare': 'string', 'yieldTokensPerShare': 'string'}),
+    'arbitrum': pd.read_csv(originFiles['arbitrum'], dtype={'shares': 'string', 'underlyingTokensPerShare': 'string', 'yieldTokensPerShare': 'string'}),
 }
 
 
@@ -113,6 +122,7 @@ for chain, df in originDataFrames.items():
 
     fileName = 'alEthValues-pivot-' + chain + '.csv'
     print(f"Saving {fileName}...")
+    stringify_int_columns(alethPivotDf, ["underlyingValue"])
     alethPivotDf.to_csv(fileName, index=False)
     print(f"Saved {fileName}")
 
@@ -122,6 +132,7 @@ for chain, df in originDataFrames.items():
 
     fileName = 'alUsdValues-pivot-' + chain + '.csv'
     print(f"Saving {fileName}...")
+    stringify_int_columns(alusdPivotDf, ["underlyingValue"])
     alusdPivotDf.to_csv(fileName, index=False)
     print(f"Saved {fileName}")
     

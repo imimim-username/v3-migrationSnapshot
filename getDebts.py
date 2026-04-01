@@ -63,7 +63,7 @@ def fetch_debt(task):
 
 for chain, files in startingFiles.items():
     for vault, fileName in files.items():
-        df = pd.read_csv(fileName)
+        df = pd.read_csv(fileName, dtype={'underlyingValue': 'string'})
         if 'debt' not in df.columns:
             df['debt'] = pd.NA
 
@@ -87,5 +87,8 @@ for chain, files in startingFiles.items():
         print(f"Done {chain}/{vault}.")
 
         newFileName = fileName.replace('pivot-', 'sum-and-debt-')
+        if 'underlyingValue' in df.columns:
+            df['underlyingValue'] = df['underlyingValue'].map(lambda x: str(int(str(x))))
+        df['debt'] = df['debt'].map(lambda x: '' if pd.isna(x) else str(int(x)))
         df.to_csv(newFileName, index=False)
         print(f"Saved {newFileName}")
